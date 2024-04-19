@@ -1,9 +1,9 @@
 package fw
 
 import (
+	"bytes"
 	"gopkg.in/natefinch/lumberjack.v2"
 	"io"
-	"strings"
 	"testing"
 )
 
@@ -38,7 +38,19 @@ func Benchmark_Lumberjack(b *testing.B) {
 	})
 }
 
-var testLogBuf = append([]byte(strings.Repeat("a", 100)), '\n')
+var testLogBuf = generateTestData()
+
+func generateTestData() []byte {
+	var buf bytes.Buffer
+	const maxCount = 100
+	for i := 0; i < 26; i++ {
+		if buf.Len() >= maxCount {
+			break
+		}
+		buf.WriteRune(rune('A' + (i % 26)))
+	}
+	return buf.Bytes()
+}
 
 func WriteLog(w io.Writer) {
 	w.Write(testLogBuf)
