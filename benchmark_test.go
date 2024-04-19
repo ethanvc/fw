@@ -3,7 +3,6 @@ package fw
 import (
 	"gopkg.in/natefinch/lumberjack.v2"
 	"io"
-	"os"
 	"strings"
 	"testing"
 )
@@ -16,7 +15,7 @@ func Benchmark_FileWriter(b *testing.B) {
 		panic(err)
 	}
 	defer w.Close()
-	defer os.Remove(fileName)
+	// defer os.Remove(fileName)
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -30,7 +29,7 @@ func Benchmark_Lumberjack(b *testing.B) {
 		Filename: "lumberjack.test.log",
 	}
 	defer w.Close()
-	defer os.Remove(w.Filename)
+	// defer os.Remove(w.Filename)
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -39,7 +38,7 @@ func Benchmark_Lumberjack(b *testing.B) {
 	})
 }
 
-var testLogBuf = []byte(strings.Repeat("a", 100))
+var testLogBuf = append([]byte(strings.Repeat("a", 100)), '\n')
 
 func WriteLog(w io.Writer) {
 	w.Write(testLogBuf)
