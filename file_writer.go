@@ -2,10 +2,12 @@ package fw
 
 import (
 	"os"
+	"sync"
 )
 
 type FileWriter struct {
-	f *os.File
+	f   *os.File
+	mux sync.Mutex
 }
 
 func NewFileWriter(fileName string) (*FileWriter, error) {
@@ -30,9 +32,19 @@ func (w *FileWriter) OpenFile(fileName string) error {
 }
 
 func (w *FileWriter) Write(p []byte) (n int, err error) {
+	w.mux.Lock()
+	defer w.mux.Unlock()
 	return w.f.Write(p)
 }
 
 func (w *FileWriter) Close() error {
-	return w.f.Close()
+	var f *os.File
+	w.mux.Lock()
+	f = w.f
+	w.f = nil
+	w.mux.Unlock()
+	if f == nil {
+		return nil
+	}
+	return f.Close()
 }
