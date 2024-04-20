@@ -8,9 +8,13 @@ type FileWriter struct {
 	f *os.File
 }
 
-func NewFileWriter() *FileWriter {
+func NewFileWriter(fileName string) (*FileWriter, error) {
 	w := &FileWriter{}
-	return w
+	err := w.OpenFile(fileName)
+	if err != nil {
+		return nil, err
+	}
+	return w, nil
 }
 
 func (w *FileWriter) OpenFile(fileName string) error {

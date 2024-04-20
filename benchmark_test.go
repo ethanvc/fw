@@ -22,9 +22,8 @@ func Benchmark_Lumberjack(b *testing.B) {
 }
 
 func Benchmark_FileWriter(b *testing.B) {
-	w := NewFileWriter()
-	fileName := "file_writer.test.log"
-	err := w.OpenFile(fileName)
+	const fileName = "file_writer.test.log"
+	w, err := NewFileWriter(fileName)
 	if err != nil {
 		panic(err)
 	}
