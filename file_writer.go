@@ -20,9 +20,7 @@ func NewFileWriter(fileName string) (*FileWriter, error) {
 }
 
 func (w *FileWriter) OpenFile(fileName string) error {
-	if w.f != nil {
-		w.f.Close()
-	}
+	w.Close()
 	var err error
 	w.f, err = os.OpenFile(fileName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 	if err != nil {

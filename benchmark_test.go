@@ -37,6 +37,22 @@ func Benchmark_FileWriter(b *testing.B) {
 	})
 }
 
+func Benchmark_MemoryMapWriter(b *testing.B) {
+	const fileName = "memory_map_writer.test.log"
+	w, err := NewMemoryMapWriter(fileName, 0)
+	if err != nil {
+		panic(err)
+	}
+	defer w.Close()
+	// defer os.Remove(fileName)
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			WriteLog(w)
+		}
+	})
+}
+
 var testLogBuf = generateTestData()
 
 func generateTestData() []byte {
@@ -53,5 +69,11 @@ func generateTestData() []byte {
 }
 
 func WriteLog(w io.Writer) {
-	w.Write(testLogBuf)
+	n, err := w.Write(testLogBuf)
+	if err != nil {
+		panic(err)
+	}
+	if n != len(testLogBuf) {
+		panic("SizeNotMatch")
+	}
 }
