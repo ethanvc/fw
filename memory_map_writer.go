@@ -2,6 +2,7 @@ package fw
 
 import (
 	"github.com/edsrzf/mmap-go"
+	"io"
 	"os"
 	"sync"
 )
@@ -61,6 +62,10 @@ func (w *MemoryMapWriter) reserveForNBytes(n int) error {
 	w.block.Unmap()
 	w.current = 0
 	var err error
+	_, err = w.f.Seek(w.CurrentFileSize+int64(w.blockSize), io.SeekStart)
+	if err != nil {
+		return err
+	}
 	w.block, err = mmap.MapRegion(w.f, w.blockSize, mmap.RDWR, 0, w.CurrentFileSize)
 	if err != nil {
 		return err
