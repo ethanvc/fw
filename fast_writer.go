@@ -15,7 +15,7 @@ type FastWriter struct {
 
 func NewFastWriter(fileName string) (*FastWriter, error) {
 	w := &FastWriter{
-		cacheSize: 64 * 1024,
+		cacheSize: 1024,
 	}
 	err := w.init(fileName)
 	if err != nil {
