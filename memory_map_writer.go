@@ -1,8 +1,8 @@
 package fw
 
 import (
+	"errors"
 	"github.com/edsrzf/mmap-go"
-	"io"
 	"os"
 	"sync"
 )
@@ -11,7 +11,7 @@ type MemoryMapWriter struct {
 	f               *os.File
 	blockSize       int
 	mux             sync.Mutex
-	CurrentFileSize int64
+	currentFileSize int64
 	block           mmap.MMap
 	current         int
 }
@@ -23,15 +23,14 @@ func NewMemoryMapWriter(fileName string, blockSize int) (*MemoryMapWriter, error
 	w := &MemoryMapWriter{
 		blockSize: blockSize,
 	}
-	err := w.OpenFile(fileName)
+	err := w.init(fileName)
 	if err != nil {
 		return nil, err
 	}
 	return w, nil
 }
 
-func (w *MemoryMapWriter) OpenFile(fileName string) error {
-	w.Close()
+func (w *MemoryMapWriter) init(fileName string) error {
 	var err error
 	w.f, err = os.OpenFile(fileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644)
 	if err != nil {
@@ -41,7 +40,7 @@ func (w *MemoryMapWriter) OpenFile(fileName string) error {
 	if err != nil {
 		return err
 	}
-	w.CurrentFileSize = fStat.Size()
+	w.currentFileSize = fStat.Size()
 	return nil
 }
 
@@ -52,6 +51,7 @@ func (w *MemoryMapWriter) Write(p []byte) (n int, err error) {
 		return 0, err
 	}
 	copy(w.block[w.current:], p)
+	w.current += len(p)
 	return len(p), nil
 }
 
@@ -62,32 +62,36 @@ func (w *MemoryMapWriter) reserveForNBytes(n int) error {
 	w.block.Unmap()
 	w.current = 0
 	var err error
-	_, err = w.f.Seek(w.CurrentFileSize+int64(w.blockSize), io.SeekStart)
+	err = w.f.Truncate(w.currentFileSize + int64(w.blockSize))
 	if err != nil {
 		return err
 	}
-	w.block, err = mmap.MapRegion(w.f, w.blockSize, mmap.RDWR, 0, w.CurrentFileSize)
+	w.block, err = mmap.MapRegion(w.f, w.blockSize, mmap.RDWR, 0, w.currentFileSize)
 	if err != nil {
 		return err
 	}
+	w.currentFileSize += int64(w.blockSize)
 	return nil
 }
 
 func (w *MemoryMapWriter) Close() error {
 	w.mux.Lock()
 	defer w.mux.Unlock()
+	if w.f == nil {
+		return nil
+	}
 	err := w.block.Unmap()
 	if err != nil {
-		return err
+		return errors.Join(errors.New("UnmapErr"), err)
 	}
-	w.block = nil
-
-	if w.f != nil {
-		err = w.f.Close()
-		if err != nil {
-			return err
-		}
-		w.f = nil
+	err = w.f.Truncate(w.currentFileSize - int64(w.blockSize-w.current))
+	if err != nil {
+		return errors.Join(errors.New("TruncateErr"), err)
 	}
+	err = w.f.Close()
+	if err != nil {
+		return errors.Join(errors.New("CloseErr"), err)
+	}
+	w.f = nil
 	return nil
 }
