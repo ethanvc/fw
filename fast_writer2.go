@@ -2,6 +2,7 @@ package fw
 
 import (
 	"os"
+	"sync"
 )
 
 type FastWriter2 struct {
@@ -31,7 +32,7 @@ func (w *FastWriter2) init(fileName string) error {
 }
 
 func (w *FastWriter2) Write(buf []byte) (n int, err error) {
-	var newBuf []byte
+	newBuf := getFromBufPool()
 	newBuf = append(newBuf, buf...)
 	w.bufChan <- newBuf
 	return len(buf), nil
@@ -44,5 +45,20 @@ func (w *FastWriter2) Close() error {
 func (w *FastWriter2) writeLoop() {
 	for buf := range w.bufChan {
 		w.f.Write(buf)
+		putToBufPool(buf)
 	}
+}
+
+var bufPool sync.Pool
+
+func putToBufPool(buf []byte) {
+	bufPool.Put(buf)
+}
+
+func getFromBufPool() []byte {
+	x := bufPool.Get()
+	if x != nil {
+		return x.([]byte)[0:0]
+	}
+	return make([]byte, 0, 1024)
 }

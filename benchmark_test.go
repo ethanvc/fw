@@ -48,6 +48,14 @@ func Benchmark_FastWriter2(b *testing.B) {
 	benchWriter(b, w)
 }
 
+func Benchmark_FastWriter3(b *testing.B) {
+	const fileName = "fast3.test.log"
+	os.Remove(fileName)
+	w, err := NewFastWriter3(fileName)
+	require.NoError(b, err)
+	benchWriter(b, w)
+}
+
 func benchWriter(b *testing.B, w io.WriteCloser) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
