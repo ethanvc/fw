@@ -56,6 +56,11 @@ func Benchmark_FastWriter3(b *testing.B) {
 	benchWriter(b, w)
 }
 
+func Benchmark_RefWriter(b *testing.B) {
+	w := NewRefWriter()
+	benchWriter(b, w)
+}
+
 func benchWriter(b *testing.B, w io.WriteCloser) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
