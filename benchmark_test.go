@@ -2,6 +2,7 @@ package fw
 
 import (
 	"bytes"
+	"github.com/ethanvc/fw/internal"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/natefinch/lumberjack.v2"
 	"io"
@@ -43,7 +44,7 @@ func Benchmark_FastWriter(b *testing.B) {
 func Benchmark_FastWriter2(b *testing.B) {
 	const fileName = "fast2.test.log"
 	os.Remove(fileName)
-	w, err := NewFastWriter2(fileName)
+	w, err := internal.NewFastWriter2(fileName)
 	require.NoError(b, err)
 	benchWriter(b, w)
 }
