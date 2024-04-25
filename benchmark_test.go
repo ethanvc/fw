@@ -20,7 +20,7 @@ func Benchmark_Lumberjack(b *testing.B) {
 func Benchmark_FileWriter(b *testing.B) {
 	const fileName = "file_writer.test.log"
 	os.Remove(fileName)
-	w, err := NewFileWriter(fileName)
+	w, err := internal.NewFileWriter(fileName)
 	require.NoError(b, err)
 	benchWriter(b, w)
 }
@@ -28,7 +28,7 @@ func Benchmark_FileWriter(b *testing.B) {
 func Benchmark_MemoryMapWriter(b *testing.B) {
 	const fileName = "memory_map_writer.test.log"
 	os.Remove(fileName)
-	w, err := NewMemoryMapWriter(fileName, 0)
+	w, err := internal.NewMemoryMapWriter(fileName, 0)
 	require.NoError(b, err)
 	benchWriter(b, w)
 }
@@ -36,7 +36,7 @@ func Benchmark_MemoryMapWriter(b *testing.B) {
 func Benchmark_FastWriter(b *testing.B) {
 	const fileName = "fast.test.log"
 	os.Remove(fileName)
-	w, err := NewFastWriter(fileName)
+	w, err := internal.NewFastWriter(fileName)
 	require.NoError(b, err)
 	benchWriter(b, w)
 }

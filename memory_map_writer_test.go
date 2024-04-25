@@ -1,6 +1,7 @@
 package fw
 
 import (
+	"github.com/ethanvc/fw/internal"
 	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
@@ -9,7 +10,7 @@ import (
 func TestMemoryMapWriter_Basic(t *testing.T) {
 	const fileName = "test.log"
 	os.Remove(fileName)
-	w, err := NewMemoryMapWriter(fileName, 0)
+	w, err := internal.NewMemoryMapWriter(fileName, 0)
 	require.NoError(t, err)
 	_, err = w.Write([]byte("test"))
 	require.NoError(t, err)
