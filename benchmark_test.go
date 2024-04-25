@@ -41,24 +41,24 @@ func Benchmark_BatchWriter(b *testing.B) {
 	benchWriter(b, w)
 }
 
-func Benchmark_FastWriter2(b *testing.B) {
-	const fileName = "fast2.test.log"
+func Benchmark_MultiBufferWriter(b *testing.B) {
+	const fileName = "multi_buffer.test.log"
 	os.Remove(fileName)
-	w, err := internal.NewFastWriter2(fileName)
+	w, err := internal.NewMultiBufferWriter(fileName)
 	require.NoError(b, err)
 	benchWriter(b, w)
 }
 
-func Benchmark_FastWriter3(b *testing.B) {
-	const fileName = "fast3.test.log"
+func Benchmark_FastWriter(b *testing.B) {
+	const fileName = "fast.test.log"
 	os.Remove(fileName)
-	w, err := NewFastWriter3(fileName)
+	w, err := NewFastWriter(fileName)
 	require.NoError(b, err)
 	benchWriter(b, w)
 }
 
 func Benchmark_RefWriter(b *testing.B) {
-	w := NewRefWriter()
+	w := internal.NewRefWriter()
 	benchWriter(b, w)
 }
 

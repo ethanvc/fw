@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-type FastWriter3 struct {
+type FastWriter struct {
 	fileMux          sync.Mutex
 	f                *os.File
 	mux              sync.Mutex
@@ -17,8 +17,8 @@ type FastWriter3 struct {
 	writerWorking    bool
 }
 
-func NewFastWriter3(fileName string) (*FastWriter3, error) {
-	w := &FastWriter3{
+func NewFastWriter(fileName string) (*FastWriter, error) {
+	w := &FastWriter{
 		bufSize: 1024 * 1024,
 	}
 	err := w.init(fileName)
@@ -28,7 +28,7 @@ func NewFastWriter3(fileName string) (*FastWriter3, error) {
 	return w, nil
 }
 
-func (w *FastWriter3) init(fileName string) error {
+func (w *FastWriter) init(fileName string) error {
 	w.bufAvailableCond = sync.NewCond(&w.mux)
 	w.notifyWriterChan = make(chan struct{}, 1)
 	w.buf = make([]byte, w.bufSize)
@@ -41,7 +41,7 @@ func (w *FastWriter3) init(fileName string) error {
 	return nil
 }
 
-func (w *FastWriter3) writeLoop() {
+func (w *FastWriter) writeLoop() {
 	buf := make([]byte, w.bufSize)
 	for {
 		w.mux.Lock()
@@ -63,7 +63,7 @@ func (w *FastWriter3) writeLoop() {
 	}
 }
 
-func (w *FastWriter3) Write(b []byte) (n int, err error) {
+func (w *FastWriter) Write(b []byte) (n int, err error) {
 	l := len(b)
 	if l > w.bufSize {
 		return w.writeToFile(b)
@@ -85,13 +85,13 @@ func (w *FastWriter3) Write(b []byte) (n int, err error) {
 	return l, nil
 }
 
-func (w *FastWriter3) writeToFile(b []byte) (n int, err error) {
+func (w *FastWriter) writeToFile(b []byte) (n int, err error) {
 	w.fileMux.Lock()
 	defer w.fileMux.Unlock()
 	return w.f.Write(b)
 }
 
-func (w *FastWriter3) Close() error {
+func (w *FastWriter) Close() error {
 	w.mux.Lock()
 	defer w.mux.Unlock()
 	return w.f.Close()

@@ -5,13 +5,13 @@ import (
 	"sync"
 )
 
-type FastWriter2 struct {
+type MultiBufferWriter struct {
 	f       *os.File
 	bufChan chan []byte
 }
 
-func NewFastWriter2(fileName string) (*FastWriter2, error) {
-	w := &FastWriter2{
+func NewMultiBufferWriter(fileName string) (*MultiBufferWriter, error) {
+	w := &MultiBufferWriter{
 		bufChan: make(chan []byte, 1000),
 	}
 	err := w.init(fileName)
@@ -21,7 +21,7 @@ func NewFastWriter2(fileName string) (*FastWriter2, error) {
 	return w, nil
 }
 
-func (w *FastWriter2) init(fileName string) error {
+func (w *MultiBufferWriter) init(fileName string) error {
 	var err error
 	w.f, err = os.OpenFile(fileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644)
 	if err != nil {
@@ -31,18 +31,18 @@ func (w *FastWriter2) init(fileName string) error {
 	return nil
 }
 
-func (w *FastWriter2) Write(buf []byte) (n int, err error) {
+func (w *MultiBufferWriter) Write(buf []byte) (n int, err error) {
 	newBuf := getFromBufPool()
 	newBuf = append(newBuf, buf...)
 	w.bufChan <- newBuf
 	return len(buf), nil
 }
 
-func (w *FastWriter2) Close() error {
+func (w *MultiBufferWriter) Close() error {
 	return w.f.Close()
 }
 
-func (w *FastWriter2) writeLoop() {
+func (w *MultiBufferWriter) writeLoop() {
 	for buf := range w.bufChan {
 		w.f.Write(buf)
 		putToBufPool(buf)
