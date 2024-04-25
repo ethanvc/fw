@@ -33,10 +33,10 @@ func Benchmark_MemoryMapWriter(b *testing.B) {
 	benchWriter(b, w)
 }
 
-func Benchmark_FastWriter(b *testing.B) {
-	const fileName = "fast.test.log"
+func Benchmark_BatchWriter(b *testing.B) {
+	const fileName = "batch.test.log"
 	os.Remove(fileName)
-	w, err := internal.NewFastWriter(fileName)
+	w, err := internal.NewBatchWriter(fileName)
 	require.NoError(b, err)
 	benchWriter(b, w)
 }

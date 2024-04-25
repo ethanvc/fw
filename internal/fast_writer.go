@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-type FastWriter struct {
+type BatchWriter struct {
 	f         *os.File
 	mux       sync.Mutex
 	buf       []byte
@@ -13,8 +13,8 @@ type FastWriter struct {
 	current   int
 }
 
-func NewFastWriter(fileName string) (*FastWriter, error) {
-	w := &FastWriter{
+func NewBatchWriter(fileName string) (*BatchWriter, error) {
+	w := &BatchWriter{
 		cacheSize: 8 * 1024,
 	}
 	err := w.init(fileName)
@@ -24,7 +24,7 @@ func NewFastWriter(fileName string) (*FastWriter, error) {
 	return w, nil
 }
 
-func (w *FastWriter) init(fileName string) error {
+func (w *BatchWriter) init(fileName string) error {
 	var err error
 	w.f, err = os.OpenFile(fileName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 	if err != nil {
@@ -34,7 +34,7 @@ func (w *FastWriter) init(fileName string) error {
 	return nil
 }
 
-func (w *FastWriter) Write(p []byte) (n int, err error) {
+func (w *BatchWriter) Write(p []byte) (n int, err error) {
 	w.mux.Lock()
 	defer w.mux.Unlock()
 	if w.current+len(p) > w.cacheSize {
@@ -49,7 +49,7 @@ func (w *FastWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func (w *FastWriter) Close() error {
+func (w *BatchWriter) Close() error {
 	w.mux.Lock()
 	defer w.mux.Unlock()
 	if w.f == nil {
