@@ -6,39 +6,64 @@ import (
 )
 
 type FastWriter struct {
-	fileMux          sync.Mutex
-	f                *os.File
-	mux              sync.Mutex
-	notifyWriterChan chan struct{}
-	bufAvailableCond *sync.Cond
-	bufSize          int
-	buf              []byte
-	current          int
-	writerWorking    bool
+	fileName            string
+	bufSize             int
+	maxHistoryFileCount int
+	fileMux             sync.Mutex
+	f                   *os.File
+	currentFileSize     int64
+	mux                 sync.Mutex
+	notifyWriterChan    chan struct{}
+	bufAvailableCond    *sync.Cond
+	buf                 []byte
+	current             int
+	writerWorking       bool
 }
 
-func NewFastWriter(fileName string) (*FastWriter, error) {
-	w := &FastWriter{
-		bufSize: 1024 * 1024,
+type FastWriterConfig struct {
+	FileName            string
+	BufferSize          int
+	MaxHistoryFileCount int
+}
+
+func (conf *FastWriterConfig) init() error {
+	if conf.FileName == "" {
+		conf.FileName = "server.log"
 	}
-	err := w.init(fileName)
+	if conf.BufferSize == 0 {
+		conf.BufferSize = 512 * 1024
+	}
+	if conf.MaxHistoryFileCount == 0 {
+		conf.MaxHistoryFileCount = 5
+	}
+	return nil
+}
+
+func NewFastWriter(conf *FastWriterConfig) (*FastWriter, error) {
+	if err := conf.init(); err != nil {
+		return nil, err
+	}
+	w := &FastWriter{
+		fileName:            conf.FileName,
+		bufSize:             conf.BufferSize,
+		maxHistoryFileCount: conf.MaxHistoryFileCount,
+		notifyWriterChan:    make(chan struct{}, 1),
+		buf:                 make([]byte, conf.BufferSize),
+	}
+	w.bufAvailableCond = sync.NewCond(&w.mux)
+
+	var err error
+	w.f, err = os.OpenFile(w.fileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644)
 	if err != nil {
 		return nil, err
 	}
-	return w, nil
-}
-
-func (w *FastWriter) init(fileName string) error {
-	w.bufAvailableCond = sync.NewCond(&w.mux)
-	w.notifyWriterChan = make(chan struct{}, 1)
-	w.buf = make([]byte, w.bufSize)
-	var err error
-	w.f, err = os.OpenFile(fileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644)
+	fStat, err := w.f.Stat()
 	if err != nil {
-		return err
+		return nil, err
 	}
+	w.currentFileSize = fStat.Size()
 	go w.writeLoop()
-	return nil
+	return w, nil
 }
 
 func (w *FastWriter) writeLoop() {
@@ -88,7 +113,9 @@ func (w *FastWriter) Write(b []byte) (n int, err error) {
 func (w *FastWriter) writeToFile(b []byte) (n int, err error) {
 	w.fileMux.Lock()
 	defer w.fileMux.Unlock()
-	return w.f.Write(b)
+	n, err = w.f.Write(b)
+	w.currentFileSize += int64(n)
+	return n, err
 }
 
 func (w *FastWriter) Close() error {

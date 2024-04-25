@@ -52,7 +52,9 @@ func Benchmark_MultiBufferWriter(b *testing.B) {
 func Benchmark_FastWriter(b *testing.B) {
 	const fileName = "fast.test.log"
 	os.Remove(fileName)
-	w, err := NewFastWriter(fileName)
+	w, err := NewFastWriter(&FastWriterConfig{
+		FileName: fileName,
+	})
 	require.NoError(b, err)
 	benchWriter(b, w)
 }
