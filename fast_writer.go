@@ -1,14 +1,18 @@
 package fw
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
+	"time"
 )
 
 type FastWriter struct {
 	fileName            string
 	bufSize             int
 	maxHistoryFileCount int
+	maxFileSize         int64
 	fileMux             sync.Mutex
 	f                   *os.File
 	currentFileSize     int64
@@ -24,6 +28,7 @@ type FastWriterConfig struct {
 	FileName            string
 	BufferSize          int
 	MaxHistoryFileCount int
+	MaxFileSize         int64
 }
 
 func (conf *FastWriterConfig) init() error {
@@ -35,6 +40,9 @@ func (conf *FastWriterConfig) init() error {
 	}
 	if conf.MaxHistoryFileCount == 0 {
 		conf.MaxHistoryFileCount = 5
+	}
+	if conf.MaxFileSize == 0 {
+		conf.MaxFileSize = 1024 * 1024 * 300
 	}
 	return nil
 }
@@ -113,9 +121,41 @@ func (w *FastWriter) Write(b []byte) (n int, err error) {
 func (w *FastWriter) writeToFile(b []byte) (n int, err error) {
 	w.fileMux.Lock()
 	defer w.fileMux.Unlock()
+	if w.currentFileSize != 0 && w.currentFileSize+int64(len(b)) > w.maxFileSize {
+		err = w.generateNewFile()
+		if err != nil {
+			return 0, err
+		}
+	}
 	n, err = w.f.Write(b)
 	w.currentFileSize += int64(n)
 	return n, err
+}
+
+func (w *FastWriter) generateNewFile() error {
+	w.f.Close()
+	os.Rename(w.fileName, getHistoryFileName(w.fileName, time.Now()))
+
+	f, err := os.OpenFile(w.fileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	fStat, err := f.Stat()
+	if err != nil {
+		return err
+	}
+	w.currentFileSize = fStat.Size()
+	w.f = f
+	return nil
+}
+
+func getHistoryFileName(fileName string, t time.Time) string {
+	d, f := filepath.Split(fileName)
+	ext := filepath.Ext(f)
+	namePart := f[0 : len(f)-len(ext)]
+	const fmtStr = "2006-01-02T15-04-05.999999999Z08-00"
+	timePart := t.Format(fmtStr)
+	return filepath.Join(d, fmt.Sprintf("%s-%s%s", namePart, timePart, ext))
 }
 
 func (w *FastWriter) Close() error {
