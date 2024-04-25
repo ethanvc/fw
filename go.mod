@@ -1,6 +1,6 @@
 module github.com/ethanvc/fw
 
-go 1.21.6
+go 1.21
 
 require (
 	github.com/edsrzf/mmap-go v1.1.0
