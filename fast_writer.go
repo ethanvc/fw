@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 )
@@ -146,16 +147,33 @@ func (w *FastWriter) generateNewFile() error {
 	}
 	w.currentFileSize = fStat.Size()
 	w.f = f
+	go w.removeHistoryFiles()
 	return nil
 }
 
+func (w *FastWriter) removeHistoryFiles() {
+	d, prefix, ext := splitFilePath(w.fileName)
+	files, _ := filepath.Glob(filepath.Join(d, fmt.Sprintf("%s*%s", prefix, ext)))
+	sort.Slice(files, func(i, j int) bool {
+		return files[i] < files[j]
+	})
+	for i := 0; i < len(files)-w.maxHistoryFileCount; i++ {
+		os.Remove(files[i])
+	}
+}
+
+func splitFilePath(p string) (d, prefix, ext string) {
+	d, f := filepath.Split(p)
+	ext = filepath.Ext(f)
+	prefix = f[0 : len(f)-len(ext)]
+	return
+}
+
 func getHistoryFileName(fileName string, t time.Time) string {
-	d, f := filepath.Split(fileName)
-	ext := filepath.Ext(f)
-	namePart := f[0 : len(f)-len(ext)]
-	const fmtStr = "2006-01-02T15-04-05.999999999Z08-00"
+	d, prefix, ext := splitFilePath(fileName)
+	const fmtStr = "2006-01-02T15-04-05.000000000Z08-00"
 	timePart := t.Format(fmtStr)
-	return filepath.Join(d, fmt.Sprintf("%s-%s%s", namePart, timePart, ext))
+	return filepath.Join(d, fmt.Sprintf("%s-%s%s", prefix, timePart, ext))
 }
 
 func (w *FastWriter) Close() error {
