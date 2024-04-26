@@ -1,49 +1,36 @@
 package fw
 
 import (
-	"fmt"
+	"errors"
+	"io"
 	"os"
-	"path/filepath"
-	"sort"
 	"sync"
-	"time"
 )
 
 type FastWriter struct {
-	fileName            string
-	bufSize             int
-	maxHistoryFileCount int
-	maxFileSize         int64
-	fileMux             sync.Mutex
-	f                   *os.File
-	currentFileSize     int64
-	mux                 sync.Mutex
-	notifyWriterChan    chan struct{}
-	bufAvailableCond    *sync.Cond
-	buf                 []byte
-	current             int
-	writerWorking       bool
+	bufSize          int
+	writerMux        sync.Mutex
+	writer           io.Writer
+	mux              sync.Mutex
+	notifyWriterChan chan struct{}
+	bufAvailableCond *sync.Cond
+	buf              []byte
+	current          int
+	writerWorking    bool
+	closed           bool
 }
 
 type FastWriterConfig struct {
-	FileName            string
-	BufferSize          int
-	MaxHistoryFileCount int
-	MaxFileSize         int64
+	Writer     io.Writer
+	BufferSize int
 }
 
 func (conf *FastWriterConfig) init() error {
-	if conf.FileName == "" {
-		conf.FileName = "server.log"
+	if conf.Writer == nil {
+		conf.Writer = os.Stdout
 	}
 	if conf.BufferSize == 0 {
 		conf.BufferSize = 512 * 1024
-	}
-	if conf.MaxHistoryFileCount == 0 {
-		conf.MaxHistoryFileCount = 5
-	}
-	if conf.MaxFileSize == 0 {
-		conf.MaxFileSize = 1024 * 1024 * 300
 	}
 	return nil
 }
@@ -53,24 +40,12 @@ func NewFastWriter(conf *FastWriterConfig) (*FastWriter, error) {
 		return nil, err
 	}
 	w := &FastWriter{
-		fileName:            conf.FileName,
-		bufSize:             conf.BufferSize,
-		maxHistoryFileCount: conf.MaxHistoryFileCount,
-		notifyWriterChan:    make(chan struct{}, 1),
-		buf:                 make([]byte, conf.BufferSize),
+		writer:           conf.Writer,
+		bufSize:          conf.BufferSize,
+		notifyWriterChan: make(chan struct{}, 1),
+		buf:              make([]byte, conf.BufferSize),
 	}
 	w.bufAvailableCond = sync.NewCond(&w.mux)
-
-	var err error
-	w.f, err = os.OpenFile(w.fileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644)
-	if err != nil {
-		return nil, err
-	}
-	fStat, err := w.f.Stat()
-	if err != nil {
-		return nil, err
-	}
-	w.currentFileSize = fStat.Size()
 	go w.writeLoop()
 	return w, nil
 }
@@ -78,33 +53,59 @@ func NewFastWriter(conf *FastWriterConfig) (*FastWriter, error) {
 func (w *FastWriter) writeLoop() {
 	buf := make([]byte, w.bufSize)
 	for {
-		w.mux.Lock()
-		for w.current == 0 {
-			w.writerWorking = false
-			w.mux.Unlock()
-			select {
-			case <-w.notifyWriterChan:
-			}
-			w.mux.Lock()
+		var wrote bool
+		buf, wrote = w.writeOnce(buf)
+		if wrote {
+			continue
 		}
-		buf, w.buf = w.buf, buf
-		contentSize := w.current
-		w.current = 0
-		w.writerWorking = true
-		w.mux.Unlock()
-		w.bufAvailableCond.Broadcast()
-		w.writeToFile(buf[0:contentSize])
+		select {
+		case <-w.notifyWriterChan:
+		}
+		if w.closed {
+			break
+		}
 	}
+	w.bufAvailableCond.Broadcast()
+}
+
+func (w *FastWriter) writeOnce(buf []byte) (freeBuf []byte, wrote bool) {
+	w.writerMux.Lock()
+	defer w.writerMux.Unlock()
+	buf, n := w.exchangeBuffer(buf)
+	if n == 0 {
+		return buf, false
+	}
+	w.bufAvailableCond.Broadcast()
+	w.writer.Write(buf[0:n])
+	return buf, true
+}
+
+func (w *FastWriter) exchangeBuffer(buf []byte) ([]byte, int) {
+	w.mux.Lock()
+	defer w.mux.Unlock()
+	if w.current == 0 {
+		w.writerWorking = false
+		return buf, 0
+	}
+	w.writerWorking = true
+	n := w.current
+	w.current = 0
+	buf, w.buf = w.buf, buf
+	return buf, n
 }
 
 func (w *FastWriter) Write(b []byte) (n int, err error) {
 	l := len(b)
 	if l > w.bufSize {
-		return w.writeToFile(b)
+		return w.writer.Write(b)
 	}
 	w.mux.Lock()
-	for l+w.current > len(w.buf) {
+	for l+w.current > len(w.buf) && !w.closed {
 		w.bufAvailableCond.Wait()
+	}
+	if w.closed {
+		w.mux.Unlock()
+		return 0, errors.New("AlreadyClosed")
 	}
 	copy(w.buf[w.current:], b)
 	w.current += l
@@ -119,65 +120,26 @@ func (w *FastWriter) Write(b []byte) (n int, err error) {
 	return l, nil
 }
 
-func (w *FastWriter) writeToFile(b []byte) (n int, err error) {
-	w.fileMux.Lock()
-	defer w.fileMux.Unlock()
-	if w.currentFileSize != 0 && w.currentFileSize+int64(len(b)) > w.maxFileSize {
-		err = w.generateNewFile()
-		if err != nil {
-			return 0, err
-		}
-	}
-	n, err = w.f.Write(b)
-	w.currentFileSize += int64(n)
-	return n, err
-}
-
-func (w *FastWriter) generateNewFile() error {
-	w.f.Close()
-	os.Rename(w.fileName, getHistoryFileName(w.fileName, time.Now()))
-
-	f, err := os.OpenFile(w.fileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644)
-	if err != nil {
-		return err
-	}
-	fStat, err := f.Stat()
-	if err != nil {
-		return err
-	}
-	w.currentFileSize = fStat.Size()
-	w.f = f
-	go w.removeHistoryFiles()
+func (w *FastWriter) Flush() error {
+	buf := make([]byte, w.bufSize)
+	w.writeOnce(buf)
 	return nil
-}
-
-func (w *FastWriter) removeHistoryFiles() {
-	d, prefix, ext := splitFilePath(w.fileName)
-	files, _ := filepath.Glob(filepath.Join(d, fmt.Sprintf("%s*%s", prefix, ext)))
-	sort.Slice(files, func(i, j int) bool {
-		return files[i] < files[j]
-	})
-	for i := 0; i < len(files)-w.maxHistoryFileCount; i++ {
-		os.Remove(files[i])
-	}
-}
-
-func splitFilePath(p string) (d, prefix, ext string) {
-	d, f := filepath.Split(p)
-	ext = filepath.Ext(f)
-	prefix = f[0 : len(f)-len(ext)]
-	return
-}
-
-func getHistoryFileName(fileName string, t time.Time) string {
-	d, prefix, ext := splitFilePath(fileName)
-	const fmtStr = "2006-01-02T15-04-05.000000000Z08-00"
-	timePart := t.Format(fmtStr)
-	return filepath.Join(d, fmt.Sprintf("%s-%s%s", prefix, timePart, ext))
 }
 
 func (w *FastWriter) Close() error {
 	w.mux.Lock()
-	defer w.mux.Unlock()
-	return w.f.Close()
+	w.closed = true
+	w.mux.Unlock()
+	select {
+	case w.notifyWriterChan <- struct{}{}:
+	default:
+	}
+	w.writeOnce(make([]byte, w.bufSize))
+
+	if realW, _ := w.writer.(io.Closer); realW != nil {
+		if err := realW.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
