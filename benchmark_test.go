@@ -1,12 +1,14 @@
 package fw
 
 import (
+	"bufio"
 	"bytes"
 	"github.com/ethanvc/fw/internal"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/natefinch/lumberjack.v2"
 	"io"
 	"os"
+	"sync"
 	"testing"
 )
 
@@ -62,6 +64,32 @@ func Benchmark_FastWriter(b *testing.B) {
 func Benchmark_NopWriter(b *testing.B) {
 	w := internal.NewNopWriter()
 	benchWriter(b, w)
+}
+
+func Benchmark_BufioWriter(b *testing.B) {
+	w := bufio.NewWriter(&lumberjack.Logger{})
+	benchWriter(b, newSequenceWriteCloser(w))
+}
+
+type nopWriteCloser struct {
+	mux sync.Mutex
+	io.Writer
+}
+
+func newSequenceWriteCloser(w io.Writer) io.WriteCloser {
+	return &nopWriteCloser{
+		Writer: w,
+	}
+}
+
+func (w *nopWriteCloser) Write(b []byte) (n int, err error) {
+	w.mux.Lock()
+	defer w.mux.Unlock()
+	return w.Writer.Write(b)
+}
+
+func (w *nopWriteCloser) Close() error {
+	return nil
 }
 
 func benchWriter(b *testing.B, w io.WriteCloser) {
