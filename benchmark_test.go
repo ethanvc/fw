@@ -59,8 +59,8 @@ func Benchmark_FastWriter(b *testing.B) {
 	benchWriter(b, w)
 }
 
-func Benchmark_RefWriter(b *testing.B) {
-	w := internal.NewRefWriter()
+func Benchmark_NopWriter(b *testing.B) {
+	w := internal.NewNopWriter()
 	benchWriter(b, w)
 }
 
