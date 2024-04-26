@@ -65,7 +65,6 @@ func (w *FastWriter) writeLoop() {
 			break
 		}
 	}
-	w.bufAvailableCond.Broadcast()
 }
 
 func (w *FastWriter) writeOnce(buf []byte) (freeBuf []byte, wrote bool) {
@@ -134,7 +133,7 @@ func (w *FastWriter) Close() error {
 	case w.notifyWriterChan <- struct{}{}:
 	default:
 	}
-	w.writeOnce(make([]byte, w.bufSize))
+	w.Flush()
 
 	if realW, _ := w.writer.(io.Closer); realW != nil {
 		if err := realW.Close(); err != nil {
