@@ -3,12 +3,14 @@ package fw
 import (
 	"bytes"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 	"runtime"
 	"sync"
 	"testing"
 )
 
 func TestFastWriter_ConcurrentWrite(t *testing.T) {
+	defer goleak.VerifyNone(t)
 	buf := bytes.NewBuffer(nil)
 	w, err := NewFastWriter(&FastWriterConfig{
 		Writer: buf,
@@ -29,4 +31,5 @@ func TestFastWriter_ConcurrentWrite(t *testing.T) {
 	wg.Wait()
 	w.Flush()
 	require.Equal(t, contentLen*concurrentCount, buf.Len())
+	w.Close()
 }
