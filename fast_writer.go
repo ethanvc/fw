@@ -122,7 +122,19 @@ func (w *FastWriter) Write(b []byte) (n int, err error) {
 func (w *FastWriter) Flush() error {
 	buf := make([]byte, w.bufSize)
 	w.writeOnce(buf)
+	w.flushWriter()
 	return nil
+}
+
+func (w *FastWriter) flushWriter() {
+	if f, _ := w.writer.(interface{ Flush() error }); f != nil {
+		f.Flush()
+		return
+	}
+	if f, _ := w.writer.(interface{ Sync() error }); f != nil {
+		f.Sync()
+		return
+	}
 }
 
 func (w *FastWriter) Close() error {
