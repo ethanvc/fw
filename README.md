@@ -1,11 +1,15 @@
+Here is a fast writer used to write log to files.
 
-https://github.com/natefinch/lumberjack
-
+Run benchmarks:
+```shell
 go test -bench . -benchmem -benchtime 3s
+```
 
-remove file rotation function form fast writer to concentrate on real important things.
+Here does not include file rotation function, if you needed, use
+[lumberjack](https://github.com/natefinch/lumberjack)
+as the underline writer.
 
-benchmark result:
+Benchmark result:
 ```shell
 $ go test -bench . -benchmem
 goos: darwin
