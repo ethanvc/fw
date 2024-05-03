@@ -1,11 +1,11 @@
-Here is a fast writer used to write log to files.
-
+FastWriter implements buffered I/O, which is fast than bufio package and have
+better P99 performance.
 Run benchmarks:
 ```shell
 go test -bench . -benchmem -benchtime 3s
 ```
 
-Here does not include file rotation function, if you needed, use
+If you need file rotation function, use
 [lumberjack](https://github.com/natefinch/lumberjack)
 as the underline writer.
 
