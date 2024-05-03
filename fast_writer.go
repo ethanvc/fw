@@ -96,7 +96,7 @@ func (w *FastWriter) exchangeBuffer(buf []byte) ([]byte, int) {
 func (w *FastWriter) Write(b []byte) (n int, err error) {
 	l := len(b)
 	if l > w.bufSize {
-		return w.writer.Write(b)
+		return w.writeDirect(b)
 	}
 	w.mux.Lock()
 	for l+w.current > len(w.buf) && !w.closed {
@@ -117,6 +117,12 @@ func (w *FastWriter) Write(b []byte) (n int, err error) {
 		}
 	}
 	return l, nil
+}
+
+func (w *FastWriter) writeDirect(b []byte) (n int, err error) {
+	w.writerMux.Lock()
+	defer w.writerMux.Unlock()
+	return w.writer.Write(b)
 }
 
 func (w *FastWriter) Flush() error {
