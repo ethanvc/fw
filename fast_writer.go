@@ -151,12 +151,6 @@ func (w *FastWriter) Close() error {
 	case w.notifyWriterChan <- struct{}{}:
 	default:
 	}
-	w.Flush()
 
-	if realW, _ := w.writer.(io.Closer); realW != nil {
-		if err := realW.Close(); err != nil {
-			return err
-		}
-	}
-	return nil
+	return w.Flush()
 }
