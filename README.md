@@ -8,6 +8,8 @@ go test -bench . -benchmem -benchtime 3s
 If you need file rotation function, use
 [lumberjack](https://github.com/natefinch/lumberjack)
 as the underline writer.
+Similar library:
+- [BufferedWriteSyncer](https://pkg.go.dev/go.uber.org/zap@v1.27.0/zapcore#BufferedWriteSyncer)
 
 Benchmark result:
 ```shell
