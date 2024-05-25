@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"github.com/ethanvc/fw/internal"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
 	"io"
 	"os"
@@ -55,9 +56,24 @@ func Benchmark_FastWriter(b *testing.B) {
 	const fileName = "fast.test.log"
 	os.Remove(fileName)
 	w, err := NewFastWriter(&FastWriterConfig{
-		Writer: &lumberjack.Logger{},
+		Writer: &lumberjack.Logger{
+			Filename: fileName,
+		},
 	})
 	require.NoError(b, err)
+	benchWriter(b, w)
+}
+
+func Benchmark_ZapBufferedWriter(b *testing.B) {
+	const fileName = "zapbuffered.test.log"
+	os.Remove(fileName)
+	lumL := &lumberjack.Logger{
+		Filename: fileName,
+	}
+	ws := zapcore.AddSync(lumL)
+	w := &zapcore.BufferedWriteSyncer{
+		WS: ws,
+	}
 	benchWriter(b, w)
 }
 
@@ -92,7 +108,7 @@ func (w *nopWriteCloser) Close() error {
 	return nil
 }
 
-func benchWriter(b *testing.B, w io.WriteCloser) {
+func benchWriter(b *testing.B, w io.Writer) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			n, err := w.Write(testLogBuf)
@@ -100,7 +116,9 @@ func benchWriter(b *testing.B, w io.WriteCloser) {
 			require.Equal(b, len(testLogBuf), n)
 		}
 	})
-	require.NoError(b, w.Close())
+	if closer, ok := w.(io.Closer); ok {
+		require.NoError(b, closer.Close())
+	}
 }
 
 var testLogBuf = generateTestData()
