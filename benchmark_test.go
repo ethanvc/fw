@@ -87,6 +87,23 @@ func Benchmark_BufioWriter(b *testing.B) {
 	benchWriter(b, newSequenceWriteCloser(w))
 }
 
+func Benchmark_CopyBuffer(b *testing.B) {
+	dst := append([]byte{}, testLogBuf...)
+	for i := 0; i < b.N; i++ {
+		copy(dst, testLogBuf)
+	}
+}
+
+func Benchmark_AcquireReleaseLock(b *testing.B) {
+	var mux sync.Mutex
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			mux.Lock()
+			mux.Unlock()
+		}
+	})
+}
+
 type nopWriteCloser struct {
 	mux sync.Mutex
 	io.Writer
