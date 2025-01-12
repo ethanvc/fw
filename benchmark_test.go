@@ -112,8 +112,12 @@ func benchWriter(b *testing.B, w io.Writer) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			n, err := w.Write(testLogBuf)
-			require.NoError(b, err)
-			require.Equal(b, len(testLogBuf), n)
+			if err != nil {
+				require.NoError(b, err)
+			}
+			if len(testLogBuf) != n {
+				require.Equal(b, len(testLogBuf), n)
+			}
 		}
 	})
 	if closer, ok := w.(io.Closer); ok {
