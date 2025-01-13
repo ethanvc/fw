@@ -17,7 +17,7 @@ func NewLockFreeWriter() *LockFreeWriter {
 
 func (w *LockFreeWriter) Write(p []byte) (n int, err error) {
 	block := w.block.Load()
-	_ = block
+	block.tryWrite(p)
 	return len(p), nil
 }
 
