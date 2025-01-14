@@ -45,3 +45,16 @@ func (b *bufferBlock) tryWrite(p []byte) bool {
 	atomic.StoreInt32(lenPointer, int32(bufLen))
 	return true
 }
+
+func (b *bufferBlock) tryGetBuffer(contentLen int) int {
+	// 4 for content len, 3 for memory alignment
+	realBufLen := contentLen + 4 + 3
+	realIndex := int(b.index.Add(int64(realBufLen)))
+	if realIndex > len(b.buf) {
+		b.index.Add(-int64(realBufLen))
+		return -1
+	}
+	realIndex -= realBufLen
+	alignedIndex := 4 - realIndex%4 + realIndex
+	return alignedIndex
+}
