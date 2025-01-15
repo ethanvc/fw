@@ -1,17 +1,24 @@
 package internal
 
 import (
+	"context"
+	"sync"
 	"sync/atomic"
 	"unsafe"
 )
 
 type LockFreeWriter struct {
-	block atomic.Pointer[bufferBlock]
+	block         atomic.Pointer[bufferBlock]
+	mux           sync.Mutex
+	cancelContext context.Context
+	cancel        context.CancelFunc
 }
 
 func NewLockFreeWriter() *LockFreeWriter {
 	w := &LockFreeWriter{}
 	w.block.Store(newBufferBlock(1024 * 1024 * 5))
+	w.cancelContext, w.cancel = context.WithCancel(context.Background())
+	go w.run()
 	return w
 }
 
@@ -19,6 +26,13 @@ func (w *LockFreeWriter) Write(p []byte) (n int, err error) {
 	block := w.block.Load()
 	block.tryWrite(p)
 	return len(p), nil
+}
+
+func (w *LockFreeWriter) Close() error {
+	return nil
+}
+
+func (w *LockFreeWriter) run() {
 }
 
 type bufferBlock struct {
