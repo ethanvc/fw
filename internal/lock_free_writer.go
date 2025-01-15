@@ -33,16 +33,12 @@ func newBufferBlock(bufSize int) *bufferBlock {
 }
 
 func (b *bufferBlock) tryWrite(p []byte) bool {
-	bufLen := len(p) + 4
-	idx := b.index.Add(int64(bufLen))
-	if int(idx) > len(b.buf) {
-		b.index.Add(-int64(bufLen))
+	bufIndex := b.tryGetBuffer(len(p))
+	if bufIndex == -1 {
 		return false
 	}
-	startIdx := int(idx) - bufLen
-	copy(b.buf[startIdx+4:], p)
-	lenPointer := (*int32)(unsafe.Pointer(&b.buf[startIdx]))
-	atomic.StoreInt32(lenPointer, int32(bufLen))
+	copy(b.buf[bufIndex+4:], p)
+	atomic.StoreInt32((*int32)(unsafe.Pointer(&b.buf[bufIndex])), int32(4+len(p)))
 	return true
 }
 
@@ -55,6 +51,6 @@ func (b *bufferBlock) tryGetBuffer(contentLen int) int {
 		return -1
 	}
 	realIndex -= realBufLen
-	alignedIndex := 4 - realIndex%4 + realIndex
+	alignedIndex := realIndex + 3 - (realIndex+3)%4
 	return alignedIndex
 }
